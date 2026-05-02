@@ -108,6 +108,12 @@ void on_ack(TCPState *tcp, int ack_no) {
     tcp->round++;
     tcp->dup_ack_count = 0;
 
+    /* 
+       PRESENTATION SCRIPT - CODE DETAIL: 
+       Explain how Tahoe grows the window on a normal ACK.
+       In Slow Start, it grows exponentially (cwnd += 1).
+       In Congestion Avoidance, it grows additively (cwnd += 1/cwnd).
+    */
     if (tcp->state == SLOW_START) {
         tcp->cwnd += 1.0;
 
@@ -146,34 +152,63 @@ void on_duplicate_ack(TCPState *tcp, int ack_no) {
         return;
     }
 
-    /*
-       Three duplicate ACKs indicate likely packet loss.
+    /* 
+       PRESENTATION SCRIPT - APPROACH & CODE DETAIL:
+       Explain why we trigger on exactly 3 DUPACKs (Fast Retransmit signal).
+       Also explain that Tahoe uniquely drops cwnd all the way back to 1.0
+       and enters Slow Start, rather than Fast Recovery like Reno.
     */
-    tcp->ssthresh = tcp->cwnd / 2.0;
-    if (tcp->ssthresh < 2.0) {
+ /*   tcp->ssthresh = tcp->cwnd / 2.0;
+    if (tcp->ssthresh < 2.0)
+    {                                        
         tcp->ssthresh = 2.0;
     }
+    The template code had a bug where it would continually drop your ssthresh value on the 4th, 5th, and 6th duplicate ACKs. 
+    TCP Tahoe should only reset its window and ssthresh on exactly the 3rd duplicate ACK, and ignore subsequent ones.
+    We updated on_duplicate_ack to handle this specifically for Tahoe.
+        
+    */
+       if (tcp->dup_ack_count == 3) {
+        tcp->ssthresh = tcp->cwnd / 2.0;
+        if (tcp->ssthresh < 2.0) {
+            tcp->ssthresh = 2.0;
+        }
 
-    if (tcp->algorithm == ALG_TAHOE) {
-        tcp->cwnd = 1.0;
-        tcp->state = SLOW_START;
-        print_tcp_status(tcp, "DUPACK", ack_no, "3 duplicate ACKs; Tahoe resets cwnd");
-    }
-    else if (tcp->algorithm == ALG_RENO) {
-        tcp->cwnd = tcp->ssthresh + 3.0;
-        tcp->state = FAST_RECOVERY;
-        print_tcp_status(tcp, "DUPACK", ack_no, "3 duplicate ACKs; Reno Fast Recovery");
-    }
-    else if (tcp->algorithm == ALG_NEWRENO) {
-        tcp->cwnd = tcp->ssthresh + 3.0;
-        tcp->state = FAST_RECOVERY;
-        print_tcp_status(tcp, "DUPACK", ack_no, "3 duplicate ACKs; NewReno Fast Recovery");
+        if (tcp->algorithm == ALG_TAHOE) {
+            tcp->cwnd = 1.0;
+            tcp->state = SLOW_START;
+            print_tcp_status(tcp, "DUPACK", ack_no, "3 duplicate ACKs; Tahoe resets cwnd to 1");
+        }
+        else if (tcp->algorithm == ALG_RENO) {
+            tcp->cwnd = tcp->ssthresh + 3.0;
+            tcp->state = FAST_RECOVERY;
+            print_tcp_status(tcp, "DUPACK", ack_no, "3 duplicate ACKs; Reno Fast Recovery");
+        }
+        else if (tcp->algorithm == ALG_NEWRENO) {
+            tcp->cwnd = tcp->ssthresh + 3.0;
+            tcp->state = FAST_RECOVERY;
+            print_tcp_status(tcp, "DUPACK", ack_no, "3 duplicate ACKs; NewReno Fast Recovery");
+        }
+    } else {
+        /* Handling the 4th, 5th, etc. duplicate ACKs */
+        if (tcp->algorithm == ALG_TAHOE) {
+            print_tcp_status(tcp, "DUPACK", ack_no, ">3 DUPACKs ignored in Tahoe");
+        } else {
+            /* Reno / NewReno inflate cwnd during fast recovery */
+            tcp->cwnd += 1.0;
+            print_tcp_status(tcp, "DUPACK", ack_no, "additional DUPACK; cwnd inflated");
+        }
     }
 }
 
 void on_timeout(TCPState *tcp) {
     tcp->round++;
 
+    /*
+       PRESENTATION SCRIPT - CODE DETAIL:
+       Explain that a Timeout is a severe congestion identifier for Tahoe.
+       We cut ssthresh in half, reset cwnd to 1, and restart Slow Start.
+    */
     tcp->ssthresh = tcp->cwnd / 2.0;
     if (tcp->ssthresh < 2.0) {
         tcp->ssthresh = 2.0;
