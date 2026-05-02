@@ -104,28 +104,31 @@ void on_duplicate_ack(TCPState *tcp, int ack_no) {
     tcp->round++;
     tcp->dup_ack_count++;
 
+    if (tcp->state == FAST_RECOVERY) {
+        tcp->cwnd += 1.0;
+        print_tcp_status(tcp, "DUPACK", ack_no, "duplicate ACK in FR; inflate cwnd");
+        return;
+    }
+
     if (tcp->dup_ack_count < 3) {
         print_tcp_status(tcp, "DUPACK", ack_no, "duplicate ACK; waiting");
         return;
     }
 
-    tcp->ssthresh = tcp->cwnd / 2.0;
-    if (tcp->ssthresh < 2.0) tcp->ssthresh = 2.0;
+    if (tcp->dup_ack_count == 3) {
+        tcp->ssthresh = tcp->cwnd / 2.0;
+        if (tcp->ssthresh < 2.0) tcp->ssthresh = 2.0;
 
-    if (tcp->algorithm == ALG_TAHOE) {
-        tcp->cwnd = 1.0;
-        tcp->state = SLOW_START;
-        print_tcp_status(tcp, "DUPACK", ack_no, "3 dup ACKs; Tahoe reset");
-    }
-    else if (tcp->algorithm == ALG_RENO) {
-        tcp->cwnd = tcp->ssthresh + 3.0;
-        tcp->state = FAST_RECOVERY;
-        print_tcp_status(tcp, "DUPACK", ack_no, "3 dup ACKs; Reno Fast Recovery");
-    }
-    else if (tcp->algorithm == ALG_NEWRENO) {
-        tcp->cwnd = tcp->ssthresh + 3.0;
-        tcp->state = FAST_RECOVERY;
-        print_tcp_status(tcp, "DUPACK", ack_no, "3 dup ACKs; NewReno");
+        if (tcp->algorithm == ALG_TAHOE) {
+            tcp->cwnd = 1.0;
+            tcp->state = SLOW_START;
+            print_tcp_status(tcp, "DUPACK", ack_no, "3 dup ACKs; Tahoe reset");
+        }
+        else if (tcp->algorithm == ALG_RENO || tcp->algorithm == ALG_NEWRENO) {
+            tcp->cwnd = tcp->ssthresh + 3.0;
+            tcp->state = FAST_RECOVERY;
+            print_tcp_status(tcp, "DUPACK", ack_no, "3 dup ACKs; Reno Fast Recovery");
+        }
     }
 }
 
