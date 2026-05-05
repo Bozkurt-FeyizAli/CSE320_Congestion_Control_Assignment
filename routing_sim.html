@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Link-State Routing — Interactive Expected Outcome</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f1f5f9; color: #1e293b; padding: 16px; min-height: 100vh;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; color: #1e293b; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #64748b; margin-bottom: 12px; }
+  .toolbar {
+    background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 12px; margin-bottom: 12px;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .toolbar .label { font-size: 11px; font-weight: 700; color: #64748b;
+    text-transform: uppercase; margin-right: 4px; }
+  .bridge-status {
+    padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;
+    border: 1px solid #cbd5e1; background: #f8fafc; color: #475569;
+  }
+  .bridge-status.online { background: #dcfce7; color: #166534; border-color: #86efac; }
+  .bridge-status.offline { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+  .btn {
+    padding: 6px 12px; font-size: 13px; font-weight: 600;
+    border-radius: 6px; border: 1px solid #cbd5e1; background: white;
+    color: #334155; cursor: pointer; transition: all 0.15s;
+  }
+  .btn:hover { background: #f8fafc; }
+  .btn.active { background: #0369a1; color: white; border-color: #0369a1; }
+  .btn.example { background: #ede9fe; color: #5b21b6; border-color: #c4b5fd; }
+  .btn.example:hover { background: #ddd6fe; }
+  .btn.clear { background: #ffe4e6; color: #9f1239; border-color: #fda4af; }
+  .btn.clear:hover { background: #fecdd3; }
+  .spacer { flex: 1; }
+  .main { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+  @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
+  .panel {
+    background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+    overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .panel-header {
+    background: #1e293b; color: white; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 8px 16px; display: flex; justify-content: space-between;
+  }
+  .panel-header .hint { font-weight: 400; text-transform: none;
+    letter-spacing: normal; color: #cbd5e1; }
+  svg { width: 100%; height: 440px; background: #f8fafc; display: block;
+    user-select: none; -webkit-user-select: none; }
+  .log-panel { background: #0f172a; border-color: #334155; height: 478px;
+    display: flex; flex-direction: column; }
+  .log-panel .panel-header { background: #1e293b; border-bottom: 1px solid #334155; }
+  .log { flex: 1; overflow-y: auto; padding: 12px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px; }
+  .log div { margin-bottom: 3px; line-height: 1.4; }
+  .log .time { color: #64748b; }
+  .log .type { color: #94a3b8; }
+  .log .system { color: #94a3b8; }
+  .log .add { color: #10b981; }
+  .log .connect { color: #38bdf8; }
+  .log .delete { color: #f43f5e; }
+  .log .update { color: #fbbf24; }
+  .log .recompute { color: #a78bfa; font-weight: 600; }
+  .log .select { color: #cbd5e1; }
+  .log .warn { color: #fb7185; }
+  .tables-panel { margin-top: 12px; }
+  .tables-grid { padding: 16px; display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .empty { color: #94a3b8; font-size: 13px; font-style: italic;
+    text-align: center; padding: 24px; }
+  .rt-card { border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }
+  .rt-card.selected { border-color: #0369a1; box-shadow: 0 0 0 2px #bae6fd; }
+  .rt-title { background: #f1f5f9; color: #334155;
+    padding: 6px 12px; font-size: 13px; font-weight: 700; }
+  .rt-card.selected .rt-title { background: #0369a1; color: white; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #f8fafc; color: #64748b; text-align: left;
+    padding: 4px 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600; }
+  td { padding: 4px 8px; font-family: "SF Mono", Menlo, monospace; color: #475569; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  td.dest { font-weight: 700; color: #1e293b; }
+  .footer-tip { margin-top: 12px; font-size: 11px; color: #64748b; text-align: center; }
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-bg.show { display: flex; }
+  .modal { background: white; border-radius: 8px; padding: 20px; min-width: 280px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+  .modal h3 { font-size: 14px; margin-bottom: 12px; color: #1e293b; }
+  .modal input { width: 100%; padding: 8px 12px; font-size: 14px;
+    border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 12px; font-family: inherit; }
+  .modal input:focus { outline: none; border-color: #0369a1; }
+  .modal-buttons { display: flex; gap: 8px; justify-content: flex-end; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Link-State Routing — Interactive Expected Outcome</h1>
+  <p class="subtitle">CENG 435 · Build the topology, watch every node recompute its routing table with Dijkstra.</p>
+
+  <div class="toolbar">
+    <span class="label">Mode:</span>
+    <button class="btn active" data-mode="add">➕ Add Node</button>
+    <button class="btn" data-mode="connect">🔗 Connect</button>
+    <button class="btn" data-mode="select">👆 Select / Drag</button>
+    <button class="btn" data-mode="delete">✕ Delete</button>
+    <div class="spacer"></div>
+    <span class="bridge-status offline" id="bridgeStatus">Bridge: offline</span>
+    <button class="btn example" id="loadExample">Load Example</button>
+    <button class="btn clear" id="clearAll">Clear</button>
+  </div>
+
+  <div class="main">
+    <div class="panel">
+      <div class="panel-header">
+        <span>Network Topology</span>
+        <span class="hint" id="modeHint">Click empty space to add a node</span>
+      </div>
+      <svg id="canvas" viewBox="0 0 600 440">
+        <defs>
+          <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+            <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#e2e8f0" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect id="bg" width="600" height="440" fill="url(#grid)"/>
+        <g id="edges"></g>
+        <g id="nodes"></g>
+        <text id="emptyMsg" x="300" y="220" text-anchor="middle"
+              font-size="14" fill="#94a3b8" pointer-events="none">Click anywhere to add your first node</text>
+      </svg>
+    </div>
+
+    <div class="panel log-panel">
+      <div class="panel-header">Event Log</div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <div class="panel tables-panel">
+    <div class="panel-header">Routing Tables (recomputed on every topology change)</div>
+    <div id="tables" class="tables-grid"></div>
+  </div>
+
+  <p class="footer-tip">
+    Tip: Try <em>Load Example</em>, then switch to <em>Select / Drag</em> and click an edge to change its cost — watch every table update.
+  </p>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">Link cost?</h3>
+    <input type="number" id="modalInput" min="1" value="1"/>
+    <div class="modal-buttons">
+      <button class="btn" id="modalCancel">Cancel</button>
+      <button class="btn active" id="modalOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let nodes = [], edges = [];
+  let mode = "add";
+  let pendingConnect = null;
+  let selectedNode = null;
+  let draggingId = null;
+  let dragMoved = false;
+  let logEntries = [];
+
+  const BRIDGE_BASE = "http://localhost:8080";
+  let bridgeRevision = 0;
+  let lastBridgeEventId = 0;
+  let pollTimer = null;
+
+  const canvas = document.getElementById("canvas");
+  const bg = document.getElementById("bg");
+  const edgesG = document.getElementById("edges");
+  const nodesG = document.getElementById("nodes");
+  const emptyMsg = document.getElementById("emptyMsg");
+  const logEl = document.getElementById("log");
+  const tablesEl = document.getElementById("tables");
+  const modeHint = document.getElementById("modeHint");
+  const bridgeStatusEl = document.getElementById("bridgeStatus");
+
+  // Modal (replaces window.prompt which is blocked in artifacts)
+  const modalBg = document.getElementById("modalBg");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalInput = document.getElementById("modalInput");
+  let modalResolve = null;
+  function askCost(title, defaultVal) {
+    return new Promise(resolve => {
+      modalTitle.textContent = title;
+      modalInput.value = defaultVal;
+      modalBg.classList.add("show");
+      setTimeout(() => { modalInput.focus(); modalInput.select(); }, 50);
+      modalResolve = resolve;
+    });
+  }
+  function closeModal(value) {
+    modalBg.classList.remove("show");
+    if (modalResolve) { modalResolve(value); modalResolve = null; }
+  }
+  document.getElementById("modalOk").addEventListener("click", () => closeModal(modalInput.value));
+  document.getElementById("modalCancel").addEventListener("click", () => closeModal(null));
+  modalInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") closeModal(modalInput.value);
+    if (e.key === "Escape") closeModal(null);
+  });
+
+  function setBridgeStatus(online, label) {
+    bridgeStatusEl.textContent = label;
+    bridgeStatusEl.classList.toggle("online", online);
+    bridgeStatusEl.classList.toggle("offline", !online);
+  }
+
+  async function bridgeRequest(path, method = "GET", body = null) {
+    const init = {
+      method,
+      headers: { "Content-Type": "application/json" },
+    };
+    if (body !== null) init.body = JSON.stringify(body);
+    const res = await fetch(BRIDGE_BASE + path, init);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `HTTP ${res.status}`);
+    }
+    return res.json();
+  }
+
+  async function notifyBridge(path, payload, warnMsg) {
+    try {
+      await bridgeRequest(path, "POST", payload);
+      return true;
+    } catch (err) {
+      pushLog("warn", `${warnMsg}: ${err.message}`);
+      return false;
+    }
+  }
+
+  async function syncTopologySnapshot(source = "ui") {
+    await notifyBridge("/topology", { nodes, edges, source }, "Bridge topology sync failed");
+  }
+
+  function normalizeBridgeEvent(entry) {
+    const type = entry.type || "system";
+    const source = entry.source || "bridge";
+    const msg = source === "c-log" ? entry.msg : `[${source}] ${entry.msg}`;
+    return { type, msg, time: entry.time || new Date().toLocaleTimeString() };
+  }
+
+  async function pollBridge() {
+    try {
+      const state = await bridgeRequest(`/events?since=${lastBridgeEventId}`);
+      setBridgeStatus(true, `Bridge: online (rev ${state.revision})`);
+
+      if (typeof state.latestEventId === "number") {
+        lastBridgeEventId = state.latestEventId;
+      }
+      if (typeof state.revision === "number" && state.revision > bridgeRevision) {
+        nodes = Array.isArray(state.nodes) ? state.nodes : nodes;
+        edges = Array.isArray(state.edges) ? state.edges : edges;
+        bridgeRevision = state.revision;
+        if (selectedNode && !nodes.find(n => n.id === selectedNode)) selectedNode = null;
+        render();
+      }
+      if (Array.isArray(state.events)) {
+        state.events.forEach(entry => {
+          if (entry.source === "ui") return;
+          const log = normalizeBridgeEvent(entry);
+          logEntries.push(log);
+        });
+        if (state.events.length) renderLog();
+      }
+    } catch {
+      setBridgeStatus(false, "Bridge: offline");
+    }
+  }
+
+  // Dijkstra
+  function dijkstra(sourceId) {
+    const adj = {};
+    nodes.forEach(n => adj[n.id] = []);
+    edges.forEach(e => {
+      adj[e.a].push({ to: e.b, cost: e.cost });
+      adj[e.b].push({ to: e.a, cost: e.cost });
+    });
+    const dist = {}, prev = {}, visited = {};
+    nodes.forEach(n => { dist[n.id] = Infinity; prev[n.id] = null; });
+    dist[sourceId] = 0;
+    const pq = nodes.map(n => n.id);
+    while (pq.length) {
+      pq.sort((x, y) => dist[x] - dist[y]);
+      const u = pq.shift();
+      if (dist[u] === Infinity) break;
+      visited[u] = true;
+      for (const { to, cost } of adj[u]) {
+        if (visited[to]) continue;
+        const alt = dist[u] + cost;
+        if (alt < dist[to]) { dist[to] = alt; prev[to] = u; }
+      }
+    }
+    const table = [];
+    for (const n of nodes) {
+      if (n.id === sourceId) { table.push({ dest: n.id, nextHop: "—", cost: 0, path: [n.id] }); continue; }
+      if (dist[n.id] === Infinity) { table.push({ dest: n.id, nextHop: "—", cost: "∞", path: [] }); continue; }
+      const path = []; let cur = n.id;
+      while (cur !== null) { path.unshift(cur); cur = prev[cur]; }
+      table.push({ dest: n.id, nextHop: path[1], cost: dist[n.id], path });
+    }
+    return table;
+  }
+
+  function pushLog(type, msg) {
+    logEntries.push({ type, msg, time: new Date().toLocaleTimeString() });
+    renderLog();
+  }
+  function renderLog() {
+    logEl.innerHTML = logEntries.map(e =>
+      `<div class="${e.type}"><span class="time">[${e.time}]</span> <span class="type">${e.type}:</span> ${escapeHtml(e.msg)}</div>`
+    ).join("");
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  function nextId() {
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    for (const L of letters) if (!nodes.find(n => n.id === L)) return L;
+    return "N" + nodes.length;
+  }
+
+  document.querySelectorAll(".btn[data-mode]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      mode = btn.dataset.mode;
+      pendingConnect = null;
+      document.querySelectorAll(".btn[data-mode]").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      updateHint();
+      render();
+    });
+  });
+
+  function updateHint() {
+    const hints = {
+      add: "Click empty space to add a node",
+      connect: pendingConnect ? `Click another node to link with ${pendingConnect}` : "Click a node to start a link",
+      select: "Click a node to view its table · drag to move",
+      delete: "Click a node or edge to remove",
+    };
+    modeHint.textContent = hints[mode];
+  }
+
+  function svgPoint(e) {
+    const pt = canvas.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    return pt.matrixTransform(canvas.getScreenCTM().inverse());
+  }
+
+  bg.addEventListener("click", async e => {
+    if (mode !== "add") return;
+    const { x, y } = svgPoint(e);
+    const id = nextId();
+    const port = 5000 + nodes.length + 1;
+    const node = { id, x, y, port };
+    nodes.push(node);
+    pushLog("add", `Node ${id} added at (${Math.round(x)}, ${Math.round(y)}), port ${port}`);
+    render();
+    await notifyBridge("/node/add", node, "Bridge node add failed");
+  });
+
+  canvas.addEventListener("mousemove", e => {
+    if (!draggingId) return;
+    const { x, y } = svgPoint(e);
+    const n = nodes.find(nn => nn.id === draggingId);
+    if (n) {
+      n.x = Math.max(30, Math.min(570, x));
+      n.y = Math.max(30, Math.min(410, y));
+      dragMoved = true;
+      render();
+    }
+  });
+  window.addEventListener("mouseup", async () => {
+    if (draggingId) {
+      draggingId = null;
+      if (dragMoved) {
+        await syncTopologySnapshot("ui-drag");
+      }
+      setTimeout(() => { dragMoved = false; }, 50);
+    }
+  });
+
+  async function handleNodeClick(node, e) {
+    e.stopPropagation();
+    if (dragMoved) return;
+    if (mode === "delete") {
+      nodes = nodes.filter(n => n.id !== node.id);
+      edges = edges.filter(ed => ed.a !== node.id && ed.b !== node.id);
+      if (selectedNode === node.id) selectedNode = null;
+      pushLog("delete", `Node ${node.id} removed (and its edges)`);
+      recomputeAndRender();
+      await notifyBridge("/node/delete", { id: node.id }, "Bridge node delete failed");
+      return;
+    }
+    if (mode === "connect") {
+      if (!pendingConnect) {
+        pendingConnect = node.id;
+        pushLog("connect", `Select second node to connect with ${node.id}…`);
+        updateHint(); render();
+      } else if (pendingConnect === node.id) {
+        pendingConnect = null;
+        pushLog("connect", "Connection cancelled");
+        updateHint(); render();
+      } else {
+        const a = pendingConnect, b = node.id;
+        const exists = edges.find(ed => (ed.a === a && ed.b === b) || (ed.a === b && ed.b === a));
+        if (exists) {
+          pushLog("warn", `Edge ${a}–${b} already exists`);
+          pendingConnect = null; updateHint(); render(); return;
+        }
+        const costStr = await askCost(`Link cost for ${a} ↔ ${b}?`, "1");
+        const cost = parseInt(costStr, 10);
+        if (!isNaN(cost) && cost > 0) {
+          edges.push({ a, b, cost });
+          pushLog("connect", `Edge ${a} ↔ ${b} added with cost ${cost}`);
+          pendingConnect = null;
+          recomputeAndRender();
+          await notifyBridge("/connect", { a, b, cost }, "Bridge connect failed");
+        } else {
+          pushLog("warn", "Invalid or cancelled — edge not added");
+          pendingConnect = null;
+          updateHint(); render();
+        }
+      }
+      return;
+    }
+    selectedNode = node.id;
+    pushLog("select", `Viewing routing table of node ${node.id}`);
+    render();
+  }
+
+  function handleNodeMouseDown(node, e) {
+    if (mode !== "select") return;
+    e.stopPropagation();
+    e.preventDefault();
+    draggingId = node.id;
+    dragMoved = false;
+  }
+
+  async function handleEdgeClick(edge, e) {
+    e.stopPropagation();
+    if (mode === "delete") {
+      edges = edges.filter(ed => ed !== edge);
+      pushLog("delete", `Edge ${edge.a}–${edge.b} removed`);
+      recomputeAndRender();
+      await notifyBridge("/disconnect", { a: edge.a, b: edge.b }, "Bridge disconnect failed");
+    } else {
+      const costStr = await askCost(`New cost for ${edge.a} ↔ ${edge.b}`, String(edge.cost));
+      const cost = parseInt(costStr, 10);
+      if (!isNaN(cost) && cost > 0) {
+        edge.cost = cost;
+        pushLog("update", `Edge ${edge.a}–${edge.b} cost changed to ${cost}`);
+        recomputeAndRender();
+        await notifyBridge("/link/cost", { a: edge.a, b: edge.b, cost }, "Bridge link-cost update failed");
+      }
+    }
+  }
+
+  function recomputeAndRender() {
+    if (nodes.length > 0) pushLog("recompute", `Topology changed → Dijkstra recomputed for ${nodes.length} node(s)`);
+    render();
+  }
+
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  function render() {
+    emptyMsg.style.display = nodes.length === 0 ? "" : "none";
+
+    edgesG.innerHTML = "";
+    edges.forEach(e => {
+      const a = nodes.find(n => n.id === e.a);
+      const b = nodes.find(n => n.id === e.b);
+      if (!a || !b) return;
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const g = document.createElementNS(SVG_NS, "g");
+      g.style.cursor = "pointer";
+      const line = document.createElementNS(SVG_NS, "line");
+      line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
+      line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
+      line.setAttribute("stroke", "#94a3b8"); line.setAttribute("stroke-width", "3");
+      g.appendChild(line);
+      const rect = document.createElementNS(SVG_NS, "rect");
+      rect.setAttribute("x", mx - 14); rect.setAttribute("y", my - 11);
+      rect.setAttribute("width", 28); rect.setAttribute("height", 20);
+      rect.setAttribute("rx", 4); rect.setAttribute("fill", "white");
+      rect.setAttribute("stroke", "#64748b"); rect.setAttribute("stroke-width", "1");
+      g.appendChild(rect);
+      const text = document.createElementNS(SVG_NS, "text");
+      text.setAttribute("x", mx); text.setAttribute("y", my + 4);
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("font-size", "12"); text.setAttribute("font-weight", "bold");
+      text.setAttribute("fill", "#334155");
+      text.style.pointerEvents = "none";
+      text.textContent = e.cost;
+      g.appendChild(text);
+      g.addEventListener("click", ev => handleEdgeClick(e, ev));
+      edgesG.appendChild(g);
+    });
+
+    nodesG.innerHTML = "";
+    nodes.forEach(n => {
+      const isSel = selectedNode === n.id;
+      const isPending = pendingConnect === n.id;
+      const fill = isSel ? "#0369a1" : isPending ? "#f59e0b" : "#ffffff";
+      const stroke = isSel ? "#0c4a6e" : isPending ? "#b45309" : "#0369a1";
+      const txtColor = isSel ? "white" : "#0c4a6e";
+      const g = document.createElementNS(SVG_NS, "g");
+      g.style.cursor = mode === "select" ? "grab" : "pointer";
+      const circle = document.createElementNS(SVG_NS, "circle");
+      circle.setAttribute("cx", n.x); circle.setAttribute("cy", n.y); circle.setAttribute("r", 24);
+      circle.setAttribute("fill", fill); circle.setAttribute("stroke", stroke); circle.setAttribute("stroke-width", "3");
+      g.appendChild(circle);
+      const label = document.createElementNS(SVG_NS, "text");
+      label.setAttribute("x", n.x); label.setAttribute("y", n.y + 5);
+      label.setAttribute("text-anchor", "middle");
+      label.setAttribute("font-size", "18"); label.setAttribute("font-weight", "bold");
+      label.setAttribute("fill", txtColor);
+      label.style.pointerEvents = "none";
+      label.textContent = n.id;
+      g.appendChild(label);
+      const port = document.createElementNS(SVG_NS, "text");
+      port.setAttribute("x", n.x); port.setAttribute("y", n.y + 40);
+      port.setAttribute("text-anchor", "middle");
+      port.setAttribute("font-size", "10"); port.setAttribute("fill", "#64748b");
+      port.style.pointerEvents = "none";
+      port.textContent = ":" + n.port;
+      g.appendChild(port);
+      g.addEventListener("click", ev => handleNodeClick(n, ev));
+      g.addEventListener("mousedown", ev => handleNodeMouseDown(n, ev));
+      nodesG.appendChild(g);
+    });
+
+    renderTables();
+    canvas.style.cursor = mode === "add" ? "crosshair" : "default";
+  }
+
+  function renderTables() {
+    if (nodes.length === 0) {
+      tablesEl.innerHTML = '<p class="empty">No nodes yet. Add some to see routing tables appear here.</p>';
+      return;
+    }
+    tablesEl.innerHTML = nodes.map(n => {
+      const table = dijkstra(n.id);
+      const isSel = selectedNode === n.id;
+      const rows = table.map(r =>
+        `<tr><td class="dest">${r.dest}</td><td>${r.nextHop}</td><td>${r.cost}</td>
+         <td>${r.path.length ? r.path.join(" → ") : "unreachable"}</td></tr>`
+      ).join("");
+      return `<div class="rt-card ${isSel ? "selected" : ""}">
+        <div class="rt-title">Node ${n.id} — routing table</div>
+        <table>
+          <thead><tr><th>Dest</th><th>Next</th><th>Cost</th><th>Path</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    }).join("");
+  }
+
+  document.getElementById("clearAll").addEventListener("click", async () => {
+    nodes = []; edges = []; selectedNode = null; pendingConnect = null;
+    pushLog("system", "Canvas cleared");
+    render();
+    await notifyBridge("/reset", {}, "Bridge reset failed");
+  });
+
+  document.getElementById("loadExample").addEventListener("click", async () => {
+    nodes = [
+      { id: "A", x: 150, y: 130, port: 5001 },
+      { id: "B", x: 430, y: 130, port: 5002 },
+      { id: "C", x: 150, y: 320, port: 5003 },
+      { id: "D", x: 430, y: 320, port: 5004 },
+    ];
+    edges = [
+      { a: "A", b: "B", cost: 1 },
+      { a: "A", b: "C", cost: 5 },
+      { a: "B", b: "C", cost: 2 },
+      { a: "B", b: "D", cost: 4 },
+      { a: "C", b: "D", cost: 1 },
+    ];
+    selectedNode = "A";
+    pushLog("system", "Loaded 4-node example topology");
+    pushLog("recompute", `Topology changed → Dijkstra recomputed for ${nodes.length} node(s)`);
+    render();
+    await syncTopologySnapshot("ui-example");
+  });
+
+  async function initBridge() {
+    await pollBridge();
+    pollTimer = setInterval(pollBridge, 1500);
+  }
+
+  window.addEventListener("beforeunload", () => {
+    if (pollTimer) clearInterval(pollTimer);
+  });
+
+  pushLog("system", "Simulator ready. Click canvas to add nodes.");
+  render();
+  initBridge();
+</script>
+</body>
+</html>
